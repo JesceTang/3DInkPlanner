@@ -33,6 +33,10 @@ add_library(3DInkPlannerCore STATIC
     slicing/TrianglePlaneIntersection.cpp
     slicing/SegmentConnector.h
     slicing/SegmentConnector.cpp
+    slicing/ContourBuilder.h
+    slicing/ContourBuilder.cpp
+    slicing/Slicer.h
+    slicing/Slicer.cpp
 )
 target_include_directories(3DInkPlannerCore PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -74,5 +78,9 @@ add_test(NAME intersection COMMAND test_intersection)
 add_executable(test_segment_connector tests/test_segment_connector.cpp)
 target_link_libraries(test_segment_connector PRIVATE 3DInkPlannerCore)
 add_test(NAME segment_connector COMMAND test_segment_connector)
+
+add_executable(test_slicer tests/test_slicer.cpp)
+target_link_libraries(test_slicer PRIVATE 3DInkPlannerCore)
+add_test(NAME slicer COMMAND test_slicer)
 
 # 开发期保留控制台便于查看 qDebug 日志；发布时可设 WIN32_EXECUTABLE TRUE 隐藏控制台。
