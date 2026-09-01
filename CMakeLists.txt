@@ -41,6 +41,12 @@ qt_add_executable(3DInkPlanner
     app/MainWindow.cpp
     graphics/GLWidget.h
     graphics/GLWidget.cpp
+    graphics/Camera.h
+    graphics/Camera.cpp
+    graphics/Shader.h
+    graphics/Shader.cpp
+    graphics/MeshRenderer.h
+    graphics/MeshRenderer.cpp
 )
 target_link_libraries(3DInkPlanner PRIVATE
     3DInkPlannerCore

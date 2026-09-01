@@ -11,5 +11,10 @@ int main(int argc, char *argv[])
     MainWindow window;
     window.show();
 
+    // 支持命令行直接打开 STL（如: 3DInkPlanner.exe model.stl）。
+    if (argc > 1) {
+        window.loadStl(QString::fromLocal8Bit(argv[1]));
+    }
+
     return app.exec();
 }
