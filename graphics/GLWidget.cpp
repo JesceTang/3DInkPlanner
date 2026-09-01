@@ -1,4 +1,4 @@
-#include "GLWidget.h"
+#include "graphics/GLWidget.h"
 
 #include <QDebug>
 #include <QOpenGLContext>

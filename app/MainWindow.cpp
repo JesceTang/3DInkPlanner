@@ -1,9 +1,9 @@
-#include "MainWindow.h"
+#include "app/MainWindow.h"
 
 #include <QMenuBar>
 #include <QStatusBar>
 
-#include "GLWidget.h"
+#include "graphics/GLWidget.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
