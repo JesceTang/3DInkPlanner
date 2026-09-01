@@ -11,6 +11,22 @@ namespace geometry {
 
 using Vec3f = Eigen::Vector3f;
 
+// 几何层全局浮点容差。所有浮点几何判断统一使用（勿用 == 直接比较浮点）。
+// 实际使用中可根据 STL 尺寸调整（见 KNOWN_ISSUES.md）。
+constexpr double kGeometryEpsilon = 1e-6;
+
+// 2D 点（切片等平面几何用 double 精度）。
+struct Point2D {
+    double x = 0.0;
+    double y = 0.0;
+};
+
+// 2D 线段（切片轮廓片段）。
+struct Segment2D {
+    Point2D p0;
+    Point2D p1;
+};
+
 // 三角面片：STL 中每个面片独立存储 3 个顶点 + 法线（无共享顶点拓扑）。
 struct Triangle {
     Vec3f v0;

@@ -23,11 +23,13 @@ qt_standard_project_setup()
 
 find_package(OpenGL REQUIRED)
 
-# 核心库：geometry + io，不依赖 Qt，便于单独测试。
+# 核心库：geometry + io + slicing，不依赖 Qt，便于单独测试。
 add_library(3DInkPlannerCore STATIC
     geometry/GeometryTypes.h
     io/STLReader.h
     io/STLReader.cpp
+    slicing/TrianglePlaneIntersection.h
+    slicing/TrianglePlaneIntersection.cpp
 )
 target_include_directories(3DInkPlannerCore PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -61,5 +63,9 @@ enable_testing()
 add_executable(test_stl_reader tests/test_stl_reader.cpp)
 target_link_libraries(test_stl_reader PRIVATE 3DInkPlannerCore)
 add_test(NAME stl_reader COMMAND test_stl_reader)
+
+add_executable(test_intersection tests/test_intersection.cpp)
+target_link_libraries(test_intersection PRIVATE 3DInkPlannerCore)
+add_test(NAME intersection COMMAND test_intersection)
 
 # 开发期保留控制台便于查看 qDebug 日志；发布时可设 WIN32_EXECUTABLE TRUE 隐藏控制台。
