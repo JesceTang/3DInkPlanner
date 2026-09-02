@@ -64,6 +64,8 @@ qt_add_executable(3DInkPlanner
     graphics/Shader.cpp
     graphics/MeshRenderer.h
     graphics/MeshRenderer.cpp
+    widgets/SliceView.h
+    widgets/SliceView.cpp
 )
 target_link_libraries(3DInkPlanner PRIVATE
     3DInkPlannerCore
@@ -102,5 +104,10 @@ add_test(NAME transform COMMAND test_transform)
 add_executable(test_path_export tests/test_path_export.cpp)
 target_link_libraries(test_path_export PRIVATE 3DInkPlannerCore)
 add_test(NAME path_export COMMAND test_path_export)
+
+add_executable(test_sample_stl tests/test_sample_stl.cpp)
+target_link_libraries(test_sample_stl PRIVATE 3DInkPlannerCore)
+target_compile_definitions(test_sample_stl PRIVATE SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME sample_stl COMMAND test_sample_stl)
 
 # 开发期保留控制台便于查看 qDebug 日志；发布时可设 WIN32_EXECUTABLE TRUE 隐藏控制台。
