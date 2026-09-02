@@ -10,6 +10,8 @@
 namespace geometry {
 
 using Vec3f = Eigen::Vector3f;
+using Vec3d = Eigen::Vector3d;
+using Mat4d = Eigen::Matrix4d;
 
 // 几何层全局浮点容差。所有浮点几何判断统一使用（勿用 == 直接比较浮点）。
 // 实际使用中可根据 STL 尺寸调整（见 KNOWN_ISSUES.md）。

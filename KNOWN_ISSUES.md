@@ -30,3 +30,4 @@
 - [ ] 轮廓简化（ContourBuilder）用"点到直线距离 <= tolerance"判共线，与拼接容差共用同一值；极端扁平的退化闭合轮廓简化后可能 < 3 顶点，未单独处理。
 - [ ] Raster Fill 不处理自交多边形（§25 明确暂不处理）；扫描线过顶点用半开区间 + 偏移半个 spacing 规避，但极端退化（顶点坐标恰为 spacing 整数倍）仍可能出奇数交点。
 - [ ] Raster Fill 仅生成 Print 段，serpentine 只反转段方向/顺序，未生成换行 Travel 连接段（空走路径优化留待 PathOptimizer）。
+- [ ] Transform 仅支持均匀缩放 + 绕 Z 旋转；任意 4×4 标定矩阵导入、非均匀缩放、绕 X/Y 轴旋转未实现（§4.1 I 扩展项）。
