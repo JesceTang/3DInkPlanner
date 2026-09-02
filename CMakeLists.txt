@@ -32,6 +32,8 @@ add_library(3DInkPlannerCore STATIC
     geometry/Transform.cpp
     io/STLReader.h
     io/STLReader.cpp
+    io/PathExporter.h
+    io/PathExporter.cpp
     slicing/TrianglePlaneIntersection.h
     slicing/TrianglePlaneIntersection.cpp
     slicing/SegmentConnector.h
@@ -96,5 +98,9 @@ add_test(NAME raster_fill COMMAND test_raster_fill)
 add_executable(test_transform tests/test_transform.cpp)
 target_link_libraries(test_transform PRIVATE 3DInkPlannerCore)
 add_test(NAME transform COMMAND test_transform)
+
+add_executable(test_path_export tests/test_path_export.cpp)
+target_link_libraries(test_path_export PRIVATE 3DInkPlannerCore)
+add_test(NAME path_export COMMAND test_path_export)
 
 # 开发期保留控制台便于查看 qDebug 日志；发布时可设 WIN32_EXECUTABLE TRUE 隐藏控制台。
