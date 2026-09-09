@@ -75,7 +75,7 @@ ClassifiedContours ContourClassifier::classify(
         return out;
     }
 
-    // ---- 1. 分离闭合环 / 开放链；丢弃退化环 ----
+    // ---- 分离闭合环 / 开放链，丢弃退化环 ----
     struct Ring {
         std::vector<geometry::Point2D> pts;
         double area = 0.0;
@@ -102,7 +102,7 @@ ClassifiedContours ContourClassifier::classify(
         return out;
     }
 
-    // ---- 2. 嵌套判定：射线法统计每个环被包含的次数 ----
+    // ---- 嵌套判定：射线法统计每个环被包含的次数 ----
     const int nr = static_cast<int>(rings.size());
     std::vector<int> containment(static_cast<std::size_t>(nr), 0);
     // contains[j][i]：环 j 是否包含环 i（按代表点判定）。
@@ -141,7 +141,7 @@ ClassifiedContours ContourClassifier::classify(
         }
     }
 
-    // ---- 3. 奇偶分内外；内环配对最小面积父外环 ----
+    // ---- 奇偶分内外，内环配对最小面积父外环 ----
     std::vector<int> outerIdx;                        // 外环的环索引
     std::vector<int> outerPos(static_cast<std::size_t>(nr), -1);  // 环索引 → polygons 下标
     std::vector<int> parent(static_cast<std::size_t>(nr), -1);    // 内环 → 父外环环索引
@@ -170,7 +170,7 @@ ClassifiedContours ContourClassifier::classify(
         }
     }
 
-    // ---- 4. 组织输出 + 方向统一（外环 CCW / 内环 CW）----
+    // ---- 组织输出 + 方向统一（外环 CCW / 内环 CW）----
     out.polygons.resize(outerIdx.size());
     for (const int i : outerIdx) {
         auto &poly = out.polygons[static_cast<std::size_t>(outerPos[static_cast<std::size_t>(i)])];

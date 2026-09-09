@@ -7,7 +7,6 @@ namespace slicing {
 
 namespace {
 
-// 顶点相对平面的位置。
 enum class Side : int {
     Below = -1,  // z < h - eps
     On = 0,      // |z - h| <= eps
@@ -34,7 +33,7 @@ std::optional<geometry::Segment2D> intersectTrianglePlane(
     const Side side[3] = {classify(z[0], h, eps), classify(z[1], h, eps),
                           classify(z[2], h, eps)};
 
-    // 三角形共面（3 个顶点都在平面上）：第一版忽略。
+    // 三角形共面（3 顶点全在平面上）：忽略，由上层计数告警。
     if (side[0] == Side::On && side[1] == Side::On && side[2] == Side::On) {
         return std::nullopt;
     }

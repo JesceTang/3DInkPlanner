@@ -39,7 +39,7 @@ std::vector<PathSegment> RasterFillGenerator::generate(
         }
     }
 
-    // 1. y 范围按外环计算（孔洞必在外环内部）。
+    // y 范围按外环计算（孔洞必在外环内部）。
     double yMin = polygon.vertices[0].y;
     double yMax = polygon.vertices[0].y;
     for (const auto &v : polygon.vertices) {
@@ -47,7 +47,7 @@ std::vector<PathSegment> RasterFillGenerator::generate(
         yMax = std::max(yMax, v.y);
     }
 
-    // 2. 每条扫描线与所有环求交 + even-odd 配对。
+    // 每条扫描线与所有环求交 + even-odd 配对。
     std::vector<Row> rows;
     for (double y = yMin + spacing * 0.5; y < yMax; y += spacing) {
         std::vector<double> xs;
@@ -74,7 +74,7 @@ std::vector<PathSegment> RasterFillGenerator::generate(
         rows.push_back(std::move(row));
     }
 
-    // 3. serpentine 输出：偶数行左→右，奇数行右→左。
+    // serpentine 输出：偶数行左→右，奇数行右→左。
     for (std::size_t r = 0; r < rows.size(); ++r) {
         const Row &row = rows[r];
         if (r % 2 == 0) {

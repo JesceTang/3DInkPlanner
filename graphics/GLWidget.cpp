@@ -70,7 +70,7 @@ void GLWidget::paintGL() {
     const QMatrix4x4 proj = toQt(m_camera.projectionMatrix());
     const QMatrix4x4 vp = proj * view;
 
-    // 模型矩阵：暂为单位阵（模型按原始坐标显示），Milestone 后续支持变换。
+    // 模型矩阵暂为单位阵（按原始坐标显示），变换支持留作扩展。
     const QMatrix4x4 model;
     const QMatrix4x4 mvp = proj * view * model;
 

@@ -123,7 +123,7 @@ void SliceView::paintEvent(QPaintEvent *) {
                        height() * 0.5 - (p.y - cy) * scale);
     };
 
-    // 1) 带孔轮廓：外环浅灰实线，内环（孔洞）紫色实线；断链红色虚线。
+    // 带孔轮廓：外环浅灰实线，内环（孔洞）紫色实线；断链红色虚线。
     const auto drawRing = [&](const std::vector<geometry::Point2D> &ring) {
         if (ring.size() < 2) {
             return;
@@ -157,7 +157,7 @@ void SliceView::paintEvent(QPaintEvent *) {
         painter.drawPolyline(qpoly);
     }
 
-    // 2) 扫描路径：Print 实线、Travel 虚线，带方向箭头。
+    // 扫描路径：Print 实线、Travel 虚线，带方向箭头。
     const double arrowLen = std::max(3.0, scale * 0.3);
     for (const auto &s : m_segments) {
         const QPointF a = toWidget(s.start);
@@ -173,7 +173,7 @@ void SliceView::paintEvent(QPaintEvent *) {
         }
     }
 
-    // 3) 起点 / 终点。
+    // 起点 / 终点。
     if (!m_segments.empty()) {
         const QPointF start = toWidget(m_segments.front().start);
         const QPointF end = toWidget(m_segments.back().end);

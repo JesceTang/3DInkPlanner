@@ -50,14 +50,12 @@ bool startsWithSolid(const std::filesystem::path &path) {
 StlReadResult readBinaryStl(const std::filesystem::path &path) {
     StlReadResult result;
 
-    // 1. 打开文件（RAII，无需手动 close）。
     std::ifstream in(path, std::ios::binary);
     if (!in) {
         result.error = "无法打开文件: " + path.string();
         return result;
     }
 
-    // 2. 文件长度校验。
     in.seekg(0, std::ios::end);
     const std::streamoff fileSize = in.tellg();
     in.seekg(0, std::ios::beg);
@@ -66,15 +64,13 @@ StlReadResult readBinaryStl(const std::filesystem::path &path) {
         return result;
     }
 
-    // 3. 读取并跳过 80 字节头。
     std::array<char, kHeaderSize> header{};
     in.read(header.data(), header.size());
 
-    // 4. 读取三角形数量。
     std::uint32_t triCount = 0;
     in.read(reinterpret_cast<char *>(&triCount), sizeof(triCount));
 
-    // 5. 校验数量合法性 + 与文件长度一致性（防越界 / 防恶意内存申请）。
+    // 数量上限 + 文件长度一致性校验（防恶意 count 撑爆内存）。
     if (triCount > kMaxTriangles) {
         result.error = "三角形数量异常: " + std::to_string(triCount);
         return result;
@@ -88,7 +84,6 @@ StlReadResult readBinaryStl(const std::filesystem::path &path) {
         return result;
     }
 
-    // 6. 逐个读取三角形（normal + 3 顶点 + 2 字节属性）。
     result.mesh.triangles.reserve(triCount);
     for (std::uint32_t i = 0; i < triCount; ++i) {
         std::array<float, 12> raw{};  // normal(3) + v0(3) + v1(3) + v2(3)

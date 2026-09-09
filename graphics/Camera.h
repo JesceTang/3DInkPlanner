@@ -5,7 +5,7 @@
 #include "geometry/GeometryTypes.h"
 
 // 轨道相机（orbit）：围绕目标点旋转 / 平移 / 缩放。
-// 内部用 Eigen 手写 View / Projection 矩阵，体现对 MVP 的理解。
+// 内部用 Eigen 手写 View / Projection 矩阵。
 class Camera {
 public:
     Camera() = default;

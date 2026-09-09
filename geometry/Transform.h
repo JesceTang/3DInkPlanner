@@ -11,7 +11,7 @@ namespace geometry {
 // 3D 仿射变换（4×4 齐次矩阵），用于模型坐标 → 设备坐标。
 //
 // 变换顺序：先缩放、再绕 Z 旋转、最后平移，即 T = Translation · RotationZ · Scale。
-// 对应指导 §4.1 I 的 P_machine = T_machine_part · T_part_model · P_model。
+// 设备坐标链：P_machine = T_machine_part · T_part_model · P_model。
 class Transform {
 public:
     // 单位变换。

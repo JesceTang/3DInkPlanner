@@ -100,7 +100,7 @@ int main() {
         checkSegment(seg, 0.0, 0.0, 10.0, 0.0, "两顶点在平面得到该边");
     }
 
-    // 7. 三角形共面 → 第一版忽略。
+    // 7. 三角形共面 → 忽略。
     {
         auto seg = slicing::intersectTrianglePlane(
             tri3f(0, 0, 5, 10, 0, 5, 0, 10, 5), 5.0, eps);

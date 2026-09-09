@@ -20,7 +20,7 @@ OptimizedPath PathOptimizer::optimize(
     geometry::Point2D startPoint, double tolerance) const {
     OptimizedPath result;
 
-    // 1. 每个 polygon 独立生成 Raster Print 段（保持各自 serpentine 行序）。
+    // 每个 polygon 独立生成 Raster Print 段（保持各自 serpentine 行序）。
     const RasterFillGenerator raster;
     std::vector<std::vector<PathSegment>> islandPaths;
     islandPaths.reserve(polygons.size());
@@ -34,8 +34,8 @@ OptimizedPath PathOptimizer::optimize(
         return result;
     }
 
-    // 2. 岛间最近邻贪心排序：从 startPoint 出发，每次选「首段起点最近」的岛。
-    //    复杂度 O(P²)，P 为同层岛数（正常模型 < 100，可接受）。
+    // 岛间最近邻贪心排序：从 startPoint 出发，每次选首段起点最近的岛。
+    // O(P²)，P 为同层岛数（正常模型 < 100）。
     std::vector<bool> used(islandPaths.size(), false);
     geometry::Point2D cursor = startPoint;
     for (size_t picked = 0; picked < islandPaths.size(); ++picked) {
@@ -54,7 +54,7 @@ OptimizedPath PathOptimizer::optimize(
         used[best] = true;
         const auto &segs = islandPaths[best];
 
-        // 3. 拼接入主序列：断点（prev.end != next.start）前插入 Travel 段。
+        // 拼接入主序列：断点（prev.end != next.start）前插入 Travel 段。
         for (const auto &seg : segs) {
             if (!result.segments.empty()) {
                 const auto &prevEnd = result.segments.back().end;

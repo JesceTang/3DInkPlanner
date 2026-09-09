@@ -48,7 +48,7 @@ SegmentConnector::Report SegmentConnector::connectWithReport(
     const double tolSq = tolerance * tolerance;
     const double invTol = 1.0 / tolerance;
 
-    // ---- 1. 端点焊接（2D 空间哈希，9 邻域查询；退化段显式丢弃并告警）----
+    // ---- 端点焊接：2D 空间哈希 + 9 邻域查询；退化段丢弃并告警 ----
     std::vector<geometry::Point2D> verts;          // 焊接后唯一顶点（代表点 = 首次出现坐标）
     std::vector<std::array<int, 2>> edges;         // 每条线段的两个顶点 ID
     std::unordered_map<GridKey2D, std::vector<int>, GridKey2DHash> grid;
@@ -93,14 +93,14 @@ SegmentConnector::Report SegmentConnector::connectWithReport(
         edges.push_back({weldPoint(s.p0), weldPoint(s.p1)});
     }
 
-    // ---- 2. 邻接表：顶点 → 关联线段 ----
+    // ---- 邻接表：顶点 → 关联线段 ----
     std::vector<std::vector<int>> incident(verts.size());
     for (int ei = 0; ei < static_cast<int>(edges.size()); ++ei) {
         incident[static_cast<std::size_t>(edges[static_cast<std::size_t>(ei)][0])].push_back(ei);
         incident[static_cast<std::size_t>(edges[static_cast<std::size_t>(ei)][1])].push_back(ei);
     }
 
-    // ---- 3. 遍历拼接（每段仅用一次，整体 O(n)）----
+    // ---- 遍历拼接：每段仅用一次，整体 O(n) ----
     std::vector<char> used(edges.size(), 0);
 
     // 在顶点 v 处沿当前方向 (from → v) 选择未用的后继线段：唯一候选直接用，

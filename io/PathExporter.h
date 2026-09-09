@@ -10,7 +10,7 @@
 
 namespace io {
 
-// 导出路径为 CSV 文本（指导 §4.1 J）。
+// 导出路径为 CSV 文本。
 // 每行：index,x,y,z,type（type = PRINT / TRAVEL），z 为所有点的层高。
 // 一个 PathSegment 贡献其 end 点（type 为该段类型），首点取第一段的 start。
 std::string exportPathCsv(const std::vector<path::PathSegment> &segments, double z);
@@ -20,7 +20,7 @@ bool writePathCsv(const std::filesystem::path &path,
                   const std::vector<path::PathSegment> &segments, double z,
                   std::string *errorOut);
 
-// 导出路径为 G-code-like 文本（指导 §4.1 J 第二版）。
+// 导出路径为 G-code-like 文本。
 // Print 段 → G1（喷印移动），Travel 段 → G0（空走移动）。
 // 先 G0 定位到首段起点，再逐段输出 end 点；Z 用 G0 Z<z> 开头设置一次。
 std::string exportPathGcode(const std::vector<path::PathSegment> &segments, double z);

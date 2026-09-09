@@ -26,13 +26,12 @@ Transform Transform::translation(const Vec3d &offset) {
 
 Transform Transform::fromOffsetRotationScale(
     const Vec3d &offset, double rotationZDeg, double scale) {
-    // 缩放（均匀）。
     Mat4d s = Mat4d::Identity();
     s(0, 0) = scale;
     s(1, 1) = scale;
     s(2, 2) = scale;
 
-    // 绕 Z 旋转（逆时针为正）。
+    // 绕 Z 旋转，逆时针为正。
     const double rad = degToRad(rotationZDeg);
     Mat4d r = Mat4d::Identity();
     r(0, 0) = std::cos(rad);
@@ -40,7 +39,6 @@ Transform Transform::fromOffsetRotationScale(
     r(1, 0) = std::sin(rad);
     r(1, 1) = std::cos(rad);
 
-    // 平移。
     Mat4d t = Mat4d::Identity();
     t(0, 3) = offset.x();
     t(1, 3) = offset.y();
