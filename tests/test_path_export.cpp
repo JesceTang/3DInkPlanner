@@ -137,6 +137,58 @@ int main() {
         check(!ok && !err.empty(), "写文件失败返回 false + error");
     }
 
+    // 10. G-code 单层：G0 Z 开头 + 定位首段起点 + Print→G1 / Travel→G0。
+    {
+        std::vector<path::PathSegment> segs = {
+            seg(0, 0, 10, 0, path::PathType::Print),
+            seg(10, 0, 10, 1, path::PathType::Travel),
+            seg(10, 1, 0, 1, path::PathType::Print)};
+        std::string g = io::exportPathGcode(segs, 0.25);
+        std::string expected =
+            "G0 Z0.250\n"
+            "G0 X0.000 Y0.000\n"
+            "G1 X10.000 Y0.000\n"
+            "G0 X10.000 Y1.000\n"
+            "G1 X0.000 Y1.000\n";
+        check(g == expected, "G-code 单层精确输出（Z/定位/G0/G1）");
+    }
+
+    // 11. G-code 空输入 → 空字符串。
+    {
+        check(io::exportPathGcode({}, 0.2).empty(), "G-code 空输入返回空字符串");
+    }
+
+    // 12. 全层批量：层注释 + 各层 Z 提升；空层跳过不产生 Z 提升。
+    {
+        std::vector<std::vector<path::PathSegment>> layers = {
+            {seg(0, 0, 1, 0, path::PathType::Print)},
+            {},  // 空层
+            {seg(0, 0, 2, 0, path::PathType::Print)}};
+        std::vector<double> zs = {0.25, 0.5, 0.75};
+        std::string g = io::exportAllLayersGcode(layers, zs);
+        bool ok = g.find("; layers: 3") != std::string::npos &&
+                  g.find("; ----- layer 0  z=0.250") != std::string::npos &&
+                  g.find("G0 Z0.250") != std::string::npos &&
+                  g.find("; ----- layer 2  z=0.750") != std::string::npos &&
+                  g.find("G0 Z0.750") != std::string::npos &&
+                  g.find("layer 1") == std::string::npos;  // 空层被跳过
+        check(ok, "全层批量 G-code（注释 + Z 提升 + 空层跳过）");
+    }
+
+    // 13. 层数与 z 表不等长 → 空字符串 / 写文件失败。
+    {
+        std::vector<std::vector<path::PathSegment>> layers = {
+            {seg(0, 0, 1, 0, path::PathType::Print)}};
+        check(io::exportAllLayersGcode(layers, {0.25, 0.5}).empty(),
+              "层数与 z 表不等长返回空");
+        std::string err;
+        check(!io::writeAllLayersGcode(
+                  std::filesystem::temp_directory_path() / "x.gcode", layers,
+                  {0.25, 0.5}, &err) &&
+                  !err.empty(),
+              "不等长写文件失败 + error");
+    }
+
     std::cout << "\n" << (g_failures == 0 ? "ALL PASS" : "HAS FAILURES")
               << " (" << g_failures << " failures)\n";
     return g_failures == 0 ? 0 : 1;

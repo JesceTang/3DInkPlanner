@@ -95,6 +95,27 @@ int main() {
         check(nearV(t.apply(V(1, 0, 0)), V(SQ2, SQ2, 0)), "绕 Z 旋转 45°");
     }
 
+    // 10. 自适应容差（geometry 层补充）：小模型用下限，大模型按尺寸放宽。
+    {
+        geometry::Mesh small;  // 10mm 立方体 → maxDim=10，scaled=1e-8 < 下限
+        small.triangles.push_back({geometry::Vec3f(0, 0, 0),
+                                   geometry::Vec3f(10, 0, 0),
+                                   geometry::Vec3f(0, 10, 10),
+                                   geometry::Vec3f::Zero()});
+        small.computeBounds();
+        check(nearD(small.adaptiveTolerance(), geometry::kGeometryEpsilon),
+              "小模型自适应容差取下限 1e-6");
+
+        geometry::Mesh big;  // 10000mm → scaled=1e-5 > 下限
+        big.triangles.push_back({geometry::Vec3f(0, 0, 0),
+                                 geometry::Vec3f(10000, 0, 0),
+                                 geometry::Vec3f(0, 10000, 10000),
+                                 geometry::Vec3f::Zero()});
+        big.computeBounds();
+        check(nearD(big.adaptiveTolerance(), 1e-5),
+              "大模型自适应容差按尺寸放宽（10000mm → 1e-5）");
+    }
+
     std::cout << "\n" << (g_failures == 0 ? "ALL PASS" : "HAS FAILURES")
               << " (" << g_failures << " failures)\n";
     return g_failures == 0 ? 0 : 1;

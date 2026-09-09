@@ -141,6 +141,60 @@ int main() {
         check(allPrint, "所有填充段类型为 Print");
     }
 
+    // 10. 带孔正方形：外 [-10,10]² 孔 [-4,4]²，孔洞区域不产生填充段。
+    {
+        auto p = poly({{-10, -10}, {10, -10}, {10, 10}, {-10, 10}});
+        p.holes.push_back({{-4, -4}, {4, -4}, {4, 4}, {-4, 4}});
+        auto segs = gen.generate(p, 2.0);
+        // 行 y=-9..9 共 10 行；|y|<4 的 4 行（-3,-1,1,3）各 2 段，其余 6 行各 1 段。
+        check(segs.size() == 14, "带孔正方形生成 14 段（4 行×2 + 6 行×1）");
+        // 所有段不得与孔内部 (-4,4)² 相交。
+        bool clearOfHole = true;
+        for (const auto &s : segs) {
+            const double midX = (s.start.x + s.end.x) * 0.5;
+            if (std::fabs(s.start.y) < 4.0 && std::fabs(midX) < 4.0 - 1e-9) {
+                clearOfHole = false;
+            }
+        }
+        check(clearOfHole, "填充段全部绕开孔洞区域");
+    }
+
+    // 11. 带孔正方形的跨孔行：偶数行 L→R，首段为 [−10,−4]。
+    // 行 y=-9,-7,...,9（索引 0..9）；|y|<4 的跨孔行为索引 3..6，
+    // 其中偶数索引 4 对应 y=-1（L→R：先 [-10,-4] 再 [4,10]）。
+    {
+        auto p = poly({{-10, -10}, {10, -10}, {10, 10}, {-10, 10}});
+        p.holes.push_back({{-4, -4}, {4, -4}, {4, 4}, {-4, 4}});
+        auto segs = gen.generate(p, 2.0);
+        bool rowOk = false;
+        for (const auto &s : segs) {
+            if (nearD(s.start.y, -1.0)) {  // 偶数跨孔行（L→R）
+                rowOk = nearD(s.start.x, -10.0) && nearD(s.end.x, -4.0);
+                break;
+            }
+        }
+        check(rowOk, "跨孔行首段为 [-10,-4]（even-odd 正确配对）");
+    }
+
+    // 12. 三孔：一竖行被 3 孔切成 4 段。
+    {
+        auto p = poly({{-30, -30}, {30, -30}, {30, 30}, {-30, 30}});
+        p.holes.push_back({{-25, -5}, {-15, -5}, {-15, 5}, {-25, 5}});  // 孔1 x∈[-25,-15]
+        p.holes.push_back({{-5, -5}, {5, -5}, {5, 5}, {-5, 5}});        // 孔2 x∈[-5,5]
+        p.holes.push_back({{15, -5}, {25, -5}, {25, 5}, {15, 5}});      // 孔3 x∈[15,25]
+        auto segs = gen.generate(p, 2.0);
+        // y=±1 等行穿过 3 孔 → 4 段。
+        bool foundQuad = false;
+        for (size_t i = 0; i + 3 < segs.size(); ++i) {
+            const double y = segs[i].start.y;
+            if (nearD(segs[i + 1].start.y, y) && nearD(segs[i + 2].start.y, y) &&
+                nearD(segs[i + 3].start.y, y)) {
+                foundQuad = true;  // 存在 4 段同行
+            }
+        }
+        check(foundQuad, "三孔截面存在 4 段同行的扫描线");
+    }
+
     std::cout << "\n" << (g_failures == 0 ? "ALL PASS" : "HAS FAILURES")
               << " (" << g_failures << " failures)\n";
     return g_failures == 0 ? 0 : 1;

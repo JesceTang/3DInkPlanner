@@ -42,15 +42,18 @@ SliceView::SliceView(QWidget *parent)
     setAutoFillBackground(false);
 }
 
-void SliceView::setData(const std::vector<geometry::Polyline> &contours,
+void SliceView::setData(const std::vector<geometry::Polygon> &polygons,
+                        const std::vector<geometry::Polyline> &openChains,
                         const std::vector<path::PathSegment> &segments) {
-    m_contours = contours;
+    m_polygons = polygons;
+    m_openChains = openChains;
     m_segments = segments;
     update();
 }
 
 void SliceView::clear() {
-    m_contours.clear();
+    m_polygons.clear();
+    m_openChains.clear();
     m_segments.clear();
     update();
 }
@@ -60,7 +63,7 @@ void SliceView::paintEvent(QPaintEvent *) {
     painter.fillRect(rect(), QColor(0x1e, 0x1e, 0x24));
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    if (m_contours.empty() && m_segments.empty()) {
+    if (m_polygons.empty() && m_openChains.empty() && m_segments.empty()) {
         painter.setPen(QColor(0x80, 0x80, 0x88));
         painter.drawText(rect(), Qt::AlignCenter,
                          QStringLiteral("加载模型并切片后，此处显示路径预览"));
@@ -79,8 +82,18 @@ void SliceView::paintEvent(QPaintEvent *) {
         maxX = std::max(maxX, p.x);
         maxY = std::max(maxY, p.y);
     };
-    for (const auto &c : m_contours) {
-        for (const auto &p : c.points) {
+    for (const auto &poly : m_polygons) {
+        for (const auto &p : poly.vertices) {
+            include(p);
+        }
+        for (const auto &hole : poly.holes) {
+            for (const auto &p : hole) {
+                include(p);
+            }
+        }
+    }
+    for (const auto &chain : m_openChains) {
+        for (const auto &p : chain.points) {
             include(p);
         }
     }
@@ -110,23 +123,38 @@ void SliceView::paintEvent(QPaintEvent *) {
                        height() * 0.5 - (p.y - cy) * scale);
     };
 
-    // 1) 轮廓：浅灰闭合/开放折线。
-    painter.setPen(QPen(QColor(0xc8, 0xc8, 0xd0), 1.0));
-    for (const auto &c : m_contours) {
-        if (c.points.empty()) {
+    // 1) 带孔轮廓：外环浅灰实线，内环（孔洞）紫色实线；断链红色虚线。
+    const auto drawRing = [&](const std::vector<geometry::Point2D> &ring) {
+        if (ring.size() < 2) {
+            return;
+        }
+        QPolygonF qpoly;
+        qpoly.reserve(static_cast<int>(ring.size() + 1));
+        for (const auto &p : ring) {
+            qpoly << toWidget(p);
+        }
+        qpoly << qpoly.first();
+        painter.drawPolygon(qpoly);
+    };
+    for (const auto &poly : m_polygons) {
+        painter.setPen(QPen(QColor(0xc8, 0xc8, 0xd0), 1.5));
+        drawRing(poly.vertices);
+        painter.setPen(QPen(QColor(0x9a, 0x76, 0xe0), 1.2));
+        for (const auto &hole : poly.holes) {
+            drawRing(hole);
+        }
+    }
+    painter.setPen(QPen(QColor(0xe0, 0x50, 0x50), 1.2, Qt::DashLine));
+    for (const auto &chain : m_openChains) {
+        if (chain.points.size() < 2) {
             continue;
         }
-        QPolygonF poly;
-        poly.reserve(static_cast<int>(c.points.size() + (c.closed ? 1 : 0)));
-        for (const auto &p : c.points) {
-            poly << toWidget(p);
+        QPolygonF qpoly;
+        qpoly.reserve(static_cast<int>(chain.points.size()));
+        for (const auto &p : chain.points) {
+            qpoly << toWidget(p);
         }
-        if (c.closed && poly.size() > 1) {
-            poly << poly.first();
-            painter.drawPolygon(poly);
-        } else {
-            painter.drawPolyline(poly);
-        }
+        painter.drawPolyline(qpoly);
     }
 
     // 2) 扫描路径：Print 实线、Travel 虚线，带方向箭头。

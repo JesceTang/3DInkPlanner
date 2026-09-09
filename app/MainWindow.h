@@ -12,6 +12,7 @@ class GLWidget;
 class SliceView;
 class QDoubleSpinBox;
 class QLabel;
+class QLineEdit;
 class QPushButton;
 class QSlider;
 
@@ -31,6 +32,7 @@ private slots:
     void openStl();
     void sliceAndGeneratePath();
     void exportCurrentLayer();
+    void exportAllLayersGcode();
     void onLayerChanged(int index);
 
 private:
@@ -39,7 +41,7 @@ private:
     QWidget *createControlBar();
     void updateSliceView();
 
-    // 将一层轮廓转换为喷印路径（仅编排：遍历闭合轮廓调用 RasterFillGenerator）。
+    // 将一层分类轮廓转换为喷印路径（仅编排：遍历带孔多边形调用 RasterFillGenerator）。
     std::vector<path::PathSegment> generatePaths(const slicing::Layer &layer,
                                                  double spacing) const;
 
@@ -54,6 +56,7 @@ private:
 
     QDoubleSpinBox *m_layerHeightSpin = nullptr;
     QDoubleSpinBox *m_spacingSpin = nullptr;
+    QLineEdit *m_zListEdit = nullptr;  // 可变层厚：显式 z 表（逗号分隔，留空=等距层高）
     QSlider *m_layerSlider = nullptr;
     QLabel *m_layerLabel = nullptr;
     QPushButton *m_exportButton = nullptr;

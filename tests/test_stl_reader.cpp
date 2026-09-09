@@ -122,7 +122,7 @@ int main() {
         std::filesystem::remove(p);
     }
 
-    // 8. ASCII STL 明确报错。
+    // 8. ASCII 文件 readBinaryStl 严格拒绝（长度布局不匹配）；readStl 自动检测成功。
     {
         const auto p = std::filesystem::temp_directory_path() / "ascii.stl";
         {
@@ -137,8 +137,95 @@ int main() {
                 << "  endfacet\n"
                 << "endsolid test\n";
         }
+        auto rb = io::readBinaryStl(p);
+        check(!rb.ok, "ASCII 文件 readBinaryStl 返回失败（严格 binary）");
+        auto ra = io::readStl(p);
+        check(ra.ok && ra.mesh.triangles.size() == 1,
+              "readStl 自动检测 ASCII 成功（1 三角形）");
+        if (ra.ok && ra.mesh.triangles.size() == 1) {
+            const auto &t = ra.mesh.triangles[0];
+            check(near(t.v1.x(), 1.f) && near(t.v2.y(), 1.f) &&
+                      near(t.normal.z(), 1.f),
+                  "ASCII 顶点与重算法向正确");
+        }
+        std::filesystem::remove(p);
+    }
+
+    // 10. ASCII 科学计数法坐标 + 多 facet。
+    {
+        const auto p = std::filesystem::temp_directory_path() / "ascii_sci.stl";
+        {
+            std::ofstream out(p);
+            out << "solid sci\n"
+                << "  facet normal 0 0 1\n"
+                << "    outer loop\n"
+                << "      vertex 0e0 0 0\n"
+                << "      vertex 1.5e1 0 0\n"
+                << "      vertex 0 2.5E1 0\n"
+                << "    endloop\n"
+                << "  endfacet\n"
+                << "  facet normal 0 0 1\n"
+                << "    outer loop\n"
+                << "      vertex 0 0 5\n"
+                << "      vertex 10 0 5\n"
+                << "      vertex 0 10 5\n"
+                << "    endloop\n"
+                << "  endfacet\n"
+                << "endsolid sci\n";
+        }
+        auto r = io::readStl(p);
+        check(r.ok && r.mesh.triangles.size() == 2, "ASCII 科学计数法 2 面片读取成功");
+        if (r.ok && r.mesh.triangles.size() == 2) {
+            check(near(r.mesh.triangles[0].v1.x(), 15.f) &&
+                      near(r.mesh.triangles[0].v2.y(), 25.f),
+                  "科学计数法坐标值正确（15 / 25）");
+        }
+        std::filesystem::remove(p);
+    }
+
+    // 11. ASCII 损坏（facet 只有 2 顶点）→ 失败 + error。
+    {
+        const auto p = std::filesystem::temp_directory_path() / "ascii_bad.stl";
+        {
+            std::ofstream out(p);
+            out << "solid bad\n"
+                << "  facet normal 0 0 0\n"
+                << "    outer loop\n"
+                << "      vertex 0 0 0\n"
+                << "      vertex 1 0 0\n"
+                << "    endloop\n"
+                << "  endfacet\n"
+                << "endsolid bad\n";
+        }
+        auto r = io::readAsciiStl(p);
+        check(!r.ok && !r.error.empty(), "ASCII 顶点数 != 3 返回失败 + error");
+        std::filesystem::remove(p);
+    }
+
+    // 12. readStl 对 binary 文件仍走 binary 路径。
+    {
+        auto p = writeStl("binary_detect.stl", 1, {tri(0.f, 0.f, 1.f, 0.f, 0.f, 1.f)});
+        auto r = io::readStl(p);
+        check(r.ok && r.mesh.triangles.size() == 1,
+              "readStl 对 binary 文件解析成功");
+        std::filesystem::remove(p);
+    }
+
+    // 9. 法向重算：文件法向字段反向/为零时，以顶点绕序重算的归一化法向为准。
+    {
+        // 顶点 (0,0,0),(1,0,0),(0,1,0) → 几何法向 (0,0,1)；文件字段写反向 (0,0,-1)。
+        std::array<float, 12> badNormal = {0.f, 0.f, -1.f,
+                                           0.f, 0.f, 0.f,
+                                           1.f, 0.f, 0.f,
+                                           0.f, 1.f, 0.f};
+        auto p = writeStl("badnormal.stl", 1, {badNormal});
         auto r = io::readBinaryStl(p);
-        check(!r.ok, "ASCII STL 返回失败（明确不支持）");
+        check(r.ok && r.mesh.triangles.size() == 1, "反向法向文件读取成功");
+        if (r.ok && r.mesh.triangles.size() == 1) {
+            const auto &n = r.mesh.triangles[0].normal;
+            check(near(n.x(), 0.f) && near(n.y(), 0.f) && near(n.z(), 1.f),
+                  "法向以绕序重算为准（(0,0,-1) 校正为 (0,0,1)）");
+        }
         std::filesystem::remove(p);
     }
 

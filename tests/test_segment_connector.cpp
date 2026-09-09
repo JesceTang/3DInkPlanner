@@ -1,6 +1,7 @@
 // SegmentConnector 单元测试（无第三方框架，失败返回非零）。
 #include "slicing/SegmentConnector.h"
 
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <string>
@@ -168,6 +169,86 @@ int main() {
         auto polys = connector.connect(segs, tol);
         check(polys.size() == 2 && countClosed(polys) == 0,
               "两个断裂开放段返回 2 个开放轮廓");
+    }
+
+    // 11. T 型接头：分支处按最小转角选主链，告警记录分支。
+    {
+        // 主链沿 x 轴直行：(0,0)-(1,0)-(2,0)；在 (1,0) 处有一条竖直分支。
+        std::vector<geometry::Segment2D> segs = {
+            seg(0, 0, 1, 0), seg(1, 0, 2, 0), seg(1, 0, 1, 1)};
+        auto rep = connector.connectWithReport(segs, tol);
+        check(rep.polylines.size() >= 1, "T 型接头不崩溃");
+        bool hasTeeWarn = false;
+        for (const auto &w : rep.warnings) {
+            if (w.find("T 型接头") != std::string::npos) {
+                hasTeeWarn = true;
+            }
+        }
+        check(hasTeeWarn, "T 型接头产生告警");
+        // 主链应为直行的 3 顶点链（最小转角原则）。
+        bool straightMain = false;
+        for (const auto &p : rep.polylines) {
+            if (p.points.size() == 3 && samePoint(p.points.front(), {0, 0}) &&
+                samePoint(p.points.back(), {2, 0})) {
+                straightMain = true;
+            }
+        }
+        check(straightMain, "T 型接头主链沿最直方向延伸");
+    }
+
+    // 12. 断链告警：开放链出现在 warnings 中。
+    {
+        std::vector<geometry::Segment2D> segs = {
+            seg(0, 0, 1, 0), seg(1, 0, 2, 0), seg(2, 0, 3, 0)};
+        auto rep = connector.connectWithReport(segs, tol);
+        check(rep.polylines.size() == 1 && !rep.polylines[0].closed,
+              "断链仍为开放轮廓");
+        bool hasOpenWarn = false;
+        for (const auto &w : rep.warnings) {
+            if (w.find("断链告警") != std::string::npos) {
+                hasOpenWarn = true;
+            }
+        }
+        check(hasOpenWarn, "断链产生告警（不崩溃、不静默）");
+    }
+
+    // 13. 退化段：零长度段被丢弃并告警。
+    {
+        std::vector<geometry::Segment2D> segs = {
+            seg(0, 0, 1, 0), seg(0.5, 0, 0.5, 0), seg(1, 0, 0, 0)};
+        auto rep = connector.connectWithReport(segs, tol);
+        check(rep.polylines.size() == 1 && rep.polylines[0].closed,
+              "退化段丢弃后轮廓正常闭合");
+        bool hasDegWarn = false;
+        for (const auto &w : rep.warnings) {
+            if (w.find("退化线段") != std::string::npos) {
+                hasDegWarn = true;
+            }
+        }
+        check(hasDegWarn, "退化线段产生告警");
+    }
+
+    // 14. 大输入性能 + 正确性：2 万段乱序圆环，O(n) 拼接 < 1s。
+    {
+        const int n = 20000;
+        std::vector<geometry::Segment2D> segs;
+        segs.reserve(static_cast<std::size_t>(n));
+        for (int i = n - 1; i >= 0; --i) {  // 逆序输入打乱
+            const double a0 = 2.0 * 3.14159265358979 * i / n;
+            const double a1 = 2.0 * 3.14159265358979 * (i + 1) / n;
+            segs.push_back(seg(10.0 * std::cos(a0), 10.0 * std::sin(a0),
+                               10.0 * std::cos(a1), 10.0 * std::sin(a1)));
+        }
+        const auto t0 = std::chrono::steady_clock::now();
+        auto polys = connector.connect(segs, 1e-6);
+        const double ms = std::chrono::duration<double, std::milli>(
+                              std::chrono::steady_clock::now() - t0)
+                              .count();
+        std::cout << "  [perf] " << n << " 段拼接 " << ms << " ms\n";
+        check(polys.size() == 1 && polys[0].closed &&
+                  polys[0].points.size() == static_cast<std::size_t>(n),
+              "2 万段圆环拼接为 1 个闭合轮廓（顶点数正确）");
+        check(ms < 1000.0, "2 万段拼接 < 1s（O(n) 哈希验证）");
     }
 
     std::cout << "\n" << (g_failures == 0 ? "ALL PASS" : "HAS FAILURES")

@@ -40,11 +40,18 @@ add_library(3DInkPlannerCore STATIC
     slicing/SegmentConnector.cpp
     slicing/ContourBuilder.h
     slicing/ContourBuilder.cpp
+    slicing/ContourClassifier.h
+    slicing/ContourClassifier.cpp
     slicing/Slicer.h
     slicing/Slicer.cpp
     path/ToolPath.h
     path/RasterFillGenerator.h
     path/RasterFillGenerator.cpp
+    path/PathOptimizer.h
+    path/PathOptimizer.cpp
+    topology/IndexedMesh.h
+    topology/MeshBuilder.h
+    topology/MeshBuilder.cpp
 )
 target_include_directories(3DInkPlannerCore PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -109,5 +116,23 @@ add_executable(test_sample_stl tests/test_sample_stl.cpp)
 target_link_libraries(test_sample_stl PRIVATE 3DInkPlannerCore)
 target_compile_definitions(test_sample_stl PRIVATE SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME sample_stl COMMAND test_sample_stl)
+
+add_executable(test_topology tests/test_topology.cpp)
+target_link_libraries(test_topology PRIVATE 3DInkPlannerCore)
+target_compile_definitions(test_topology PRIVATE SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME topology COMMAND test_topology)
+
+add_executable(test_contour_classifier tests/test_contour_classifier.cpp)
+target_link_libraries(test_contour_classifier PRIVATE 3DInkPlannerCore)
+target_compile_definitions(test_contour_classifier PRIVATE SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME contour_classifier COMMAND test_contour_classifier)
+
+add_executable(test_path_optimizer tests/test_path_optimizer.cpp)
+target_link_libraries(test_path_optimizer PRIVATE 3DInkPlannerCore)
+add_test(NAME path_optimizer COMMAND test_path_optimizer)
+
+# 性能基准工具（不进 ctest，手动运行）：bench_pipeline.exe <stl> [layerHeight] [spacing]
+add_executable(bench_pipeline bench/bench_pipeline.cpp)
+target_link_libraries(bench_pipeline PRIVATE 3DInkPlannerCore)
 
 # 开发期保留控制台便于查看 qDebug 日志；发布时可设 WIN32_EXECUTABLE TRUE 隐藏控制台。

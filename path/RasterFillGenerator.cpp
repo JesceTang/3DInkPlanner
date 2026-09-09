@@ -28,7 +28,18 @@ std::vector<PathSegment> RasterFillGenerator::generate(
         return result;
     }
 
-    // 1. y 范围。
+    // 参与求交的环：外环 + 全部内环（孔洞）。
+    // even-odd 配对天然扣除孔洞：进/出孔各翻转一次奇偶，孔内不产生填充段。
+    std::vector<const std::vector<geometry::Point2D> *> rings;
+    rings.reserve(1 + polygon.holes.size());
+    rings.push_back(&polygon.vertices);
+    for (const auto &hole : polygon.holes) {
+        if (hole.size() >= 3) {
+            rings.push_back(&hole);
+        }
+    }
+
+    // 1. y 范围按外环计算（孔洞必在外环内部）。
     double yMin = polygon.vertices[0].y;
     double yMax = polygon.vertices[0].y;
     for (const auto &v : polygon.vertices) {
@@ -36,17 +47,21 @@ std::vector<PathSegment> RasterFillGenerator::generate(
         yMax = std::max(yMax, v.y);
     }
 
-    // 2. 每条扫描线求交 + even-odd 配对。
+    // 2. 每条扫描线与所有环求交 + even-odd 配对。
     std::vector<Row> rows;
     for (double y = yMin + spacing * 0.5; y < yMax; y += spacing) {
         std::vector<double> xs;
-        for (std::size_t i = 0; i < n; ++i) {
-            const geometry::Point2D &p0 = polygon.vertices[i];
-            const geometry::Point2D &p1 = polygon.vertices[(i + 1) % n];
-            // 半开区间 [min, max)：避免顶点被相邻两条边重复计数。
-            if ((p0.y <= y && y < p1.y) || (p1.y <= y && y < p0.y)) {
-                const double t = (y - p0.y) / (p1.y - p0.y);
-                xs.push_back(p0.x + t * (p1.x - p0.x));
+        for (const auto *ring : rings) {
+            const auto &pts = *ring;
+            const std::size_t m = pts.size();
+            for (std::size_t i = 0; i < m; ++i) {
+                const geometry::Point2D &p0 = pts[i];
+                const geometry::Point2D &p1 = pts[(i + 1) % m];
+                // 半开区间 [min, max)：避免顶点被相邻两条边重复计数。
+                if ((p0.y <= y && y < p1.y) || (p1.y <= y && y < p0.y)) {
+                    const double t = (y - p0.y) / (p1.y - p0.y);
+                    xs.push_back(p0.x + t * (p1.x - p0.x));
+                }
             }
         }
         std::sort(xs.begin(), xs.end());

@@ -51,6 +51,10 @@ struct Mesh {
 
     // 包围盒最大边长（用于相机距离缩放）。
     float maxDimension() const;
+
+    // 推荐的几何容差：按模型尺寸自适应。
+    // 大模型浮点误差累积更大，容差按比例放宽；小模型用全局下限 kGeometryEpsilon。
+    double adaptiveTolerance() const;
 };
 
 inline void Mesh::computeBounds() {
@@ -75,6 +79,11 @@ inline Vec3f Mesh::center() const {
 
 inline float Mesh::maxDimension() const {
     return (maxBound - minBound).maxCoeff();
+}
+
+inline double Mesh::adaptiveTolerance() const {
+    const double scaled = static_cast<double>(maxDimension()) * 1e-9;
+    return scaled > kGeometryEpsilon ? scaled : kGeometryEpsilon;
 }
 
 } // namespace geometry

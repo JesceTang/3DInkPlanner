@@ -30,3 +30,7 @@ CMakeLists.txt.user
 *.lib
 *.so
 *.dylib
+
+# Python »º´æ
+__pycache__/
+*.pyc

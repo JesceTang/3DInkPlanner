@@ -189,6 +189,114 @@ int main() {
               "三棱柱中间切片得到闭合三角形（3 顶点）");
     }
 
+    // 10. sliceLayer：分类结果填入 Layer（cube → 1 多边形 0 孔）。
+    {
+        auto mesh = makeCube(10.0f);
+        auto layer = slicer.sliceLayer(mesh, 0.0, tol);
+        check(layer.classified.polygons.size() == 1 &&
+                  layer.classified.polygons[0].holes.empty(),
+              "sliceLayer 分类：cube → 1 多边形 0 孔");
+    }
+
+    // 11. 可变层厚：显式 z 表 {-5, 0, 5} → 3 层且 z 值正确；区间外被跳过。
+    {
+        auto mesh = makeCube(10.0f);
+        auto layers = slicer.sliceAll(mesh, std::vector<double>{-5.0, 0.0, 5.0, 100.0}, tol);
+        bool zOk = layers.size() == 3 && nearD(layers[0].z, -5.0) &&
+                   nearD(layers[1].z, 0.0) && nearD(layers[2].z, 5.0);
+        check(zOk, "可变层厚 z 表正确（区间外 z 被跳过）");
+        bool allClosed = layers.size() == 3;
+        for (const auto &layer : layers) {
+            allClosed = allClosed && layer.classified.polygons.size() == 1;
+        }
+        check(allClosed, "可变层厚每层分类出 1 个多边形");
+    }
+
+    // 12. 空 z 表 → 空。
+    {
+        auto mesh = makeCube(10.0f);
+        check(slicer.sliceAll(mesh, std::vector<double>{}, tol).empty(),
+              "空 z 表返回空");
+    }
+
+    // 13. 乱序 z 表 → 输出按 z 升序（扫描线算法约定）。
+    {
+        auto mesh = makeCube(10.0f);
+        auto layers = slicer.sliceAll(mesh, std::vector<double>{5.0, -5.0, 0.0, 100.0}, tol);
+        bool zOk = layers.size() == 3 && nearD(layers[0].z, -5.0) &&
+                   nearD(layers[1].z, 0.0) && nearD(layers[2].z, 5.0);
+        check(zOk, "乱序 z 表输出升序层");
+    }
+
+    // 14. 扫描线 sliceAll 与逐层 slice（全量遍历）结果一致（加速正确性交叉验证）。
+    {
+        auto mesh = makePrism(10.0f);
+        auto layers = slicer.sliceAll(mesh, 2.5, tol);
+        bool consistent = layers.size() == 8;
+        for (const auto &layer : layers) {
+            auto ref = slicer.slice(mesh, layer.z, tol);
+            consistent = consistent && ref.size() == 1 && layer.contours.size() == 1 &&
+                         layer.contours[0].closed &&
+                         samePointSet(ref[0].points, layer.contours[0].points);
+        }
+        check(consistent, "扫描线 sliceAll 与逐层 slice 结果一致（三棱柱 8 层）");
+    }
+
+    // 15. 共面检测：切在 cube 顶面（z=+10）→ 顶面 2 个三角形共面，告警存在。
+    {
+        auto mesh = makeCube(10.0f);
+        auto layer = slicer.sliceLayer(mesh, 10.0, tol);
+        check(layer.coplanarTriangleCount == 2, "顶面 2 个共面三角形被计数");
+        check(!layer.classified.warnings.empty(), "共面层产生显式告警");
+        // 非共面层（z=0）无共面计数。
+        auto mid = slicer.sliceLayer(mesh, 0.0, tol);
+        check(mid.coplanarTriangleCount == 0, "中间层无共面三角形");
+    }
+
+    // 16. 并行分层与串行逐点一致（cube 40 层，threads=4 vs 1）。
+    //     并行分块不改变任何一层的计算输入与顺序，输出应位级一致。
+    {
+        auto mesh = makeCube(10.0f);
+        auto serial = slicer.sliceAll(mesh, 0.5, tol, 1);
+        auto parallel = slicer.sliceAll(mesh, 0.5, tol, 4);
+        bool same = serial.size() == 40 && parallel.size() == 40;
+        for (size_t i = 0; same && i < serial.size(); ++i) {
+            const auto &a = serial[i];
+            const auto &b = parallel[i];
+            same = nearD(a.z, b.z) &&
+                   a.contours.size() == b.contours.size() &&
+                   a.classified.polygons.size() == b.classified.polygons.size() &&
+                   a.classified.openChains.size() == b.classified.openChains.size() &&
+                   a.coplanarTriangleCount == b.coplanarTriangleCount &&
+                   a.classified.warnings.size() == b.classified.warnings.size();
+            for (size_t k = 0; same && k < a.contours.size(); ++k) {
+                same = a.contours[k].closed == b.contours[k].closed &&
+                       a.contours[k].points.size() == b.contours[k].points.size();
+                for (size_t p = 0; same && p < a.contours[k].points.size(); ++p) {
+                    same = samePoint(a.contours[k].points[p], b.contours[k].points[p]);
+                }
+            }
+            for (size_t k = 0; same && k < a.classified.polygons.size(); ++k) {
+                same = a.classified.polygons[k].holes.size() ==
+                       b.classified.polygons[k].holes.size();
+            }
+        }
+        check(same, "并行分层与串行逐点一致（40 层 × 4 线程）");
+
+        // z 表版同样一致（乱序输入，验证分块与排序组合的正确性）。
+        const std::vector<double> zs{5.0, -5.0, 0.0, 2.5, -2.5,
+                                     7.5, -7.5, 1.0, -1.0, 3.0};
+        auto s2 = slicer.sliceAll(mesh, zs, tol, 1);
+        auto p2 = slicer.sliceAll(mesh, zs, tol, 3);
+        bool same2 = s2.size() == 10 && p2.size() == 10;
+        for (size_t i = 0; same2 && i < s2.size(); ++i) {
+            same2 = nearD(s2[i].z, p2[i].z) &&
+                    s2[i].contours.size() == p2[i].contours.size() &&
+                    s2[i].classified.polygons.size() == p2[i].classified.polygons.size();
+        }
+        check(same2, "并行 z 表分层与串行一致（乱序输入 × 3 线程）");
+    }
+
     std::cout << "\n" << (g_failures == 0 ? "ALL PASS" : "HAS FAILURES")
               << " (" << g_failures << " failures)\n";
     return g_failures == 0 ? 0 : 1;
