@@ -1,142 +1,92 @@
-# 3DInkPlanner
+# 3D Ink Planner
 
-桌面端 3D 喷墨打印预处理与路径规划 Demo。基于 C++17 / Qt6 / OpenGL / Eigen 从零实现，覆盖「STL 导入 → 3D 显示 → 分层切片 → 二维轮廓重建 → 扫描填充路径 → 设备坐标变换 → CSV 导出」完整预处理流程。项目作为求职作品，强调**分层架构**与**可测试的几何/路径算法**，核心算法不依赖任何 UI 框架。
+**[中文文档](README.zh-CN.md)**
 
-## 处理流程
+![C++17](https://img.shields.io/badge/C%2B%2B-17-blue) ![Qt6](https://img.shields.io/badge/Qt-6-green) ![OpenGL](https://img.shields.io/badge/OpenGL-3.3-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
-```text
-3D Mesh (STL)
-      ↓
-Triangle-Plane Intersection   分层切片
-      ↓
-Segment Connection            离散线段 → 有序轮廓
-      ↓
-Contour Simplification        移除共线冗余顶点
-      ↓
-Raster Fill                   等距扫描线填充（serpentine）
-      ↓
-Coordinate Transform          模型坐标 → 设备坐标
-      ↓
-CSV Export                    PRINT / TRAVEL 路径导出
-```
+A desktop pre-processing and toolpath planning application for 3D inkjet printing, built from scratch with C++17 / Qt6 / OpenGL / Eigen. It covers the full pipeline: **STL import → mesh topology validation → layer slicing → 2D contour reconstruction → scan-fill toolpath generation → G-code / CSV export**.
 
-## 功能特性
+The project emphasizes **layered architecture** and **testable geometry/path algorithms** — the core engine is a pure C++ static library with zero Qt dependencies, fully testable headless.
 
-- **Binary STL 导入**：解析二进制 STL，校验文件头/三角形数，计算包围盒
-- **OpenGL 3D Viewer**：轨道相机（旋转/平移/缩放）、Lambert 光照、坐标轴
-- **分层切片**：三角形与 Z 平面求交（半开区间规则避免顶点重复计数）
-- **轮廓重建**：无序切片线段贪心双向拼接为有序轮廓，移除共线点
-- **扫描填充路径**：等距水平扫描线 + even-odd 规则 + serpentine 顺序
-- **坐标变换**：`T = Translation · RotationZ · Scale` 齐次变换
-- **CSV 导出**：逐点 `index,x,y,z,type`（PRINT / TRAVEL）
-- **2D 路径预览**：轮廓 + 扫描路径 + 方向箭头 + 起点/终点，Layer Slider 逐层查看
+![Main UI: 3D view + 2D toolpath preview of a plate with 3 through-holes](docs/images/screenshot_main.png)
 
-## 架构
+*Left: OpenGL 3D model view. Right: 2D layer preview — blue solid = print segments (serpentine fill with holes automatically excluded), orange dashed = travel moves, purple = hole inner rings. Bottom: layer slider and export controls.*
+
+## Features
+
+- **STL import (Binary/ASCII auto-detection)**: header/triangle-count validation, bounding box computation; face normals recomputed from winding order (immune to broken normal fields)
+- **Mesh topology health check**: O(n) spatial-hashing vertex welding, manifold/boundary/non-manifold edge statistics, connected components, signed-volume validation, BFS-based normal consistency repair
+- **OpenGL 3D viewer**: orbital camera (rotate/pan/zoom), Lambert lighting, coordinate axes
+- **Layer slicing**: triangle–plane intersection with half-open interval rule; sweep-line active-set acceleration + multithreaded layer partitioning (parallel output is bit-identical to serial)
+- **Contour reconstruction**: O(n) endpoint-hash stitching into ordered contours, T-junction minimum-turn selection, explicit open-chain warnings
+- **Inner/outer ring classification**: ray-casting containment for hole detection, inner rings paired with smallest-area parent, direction normalization (outer CCW / inner CW)
+- **Scan-fill toolpaths**: equidistant scanlines + even-odd pairing (holes excluded naturally) + serpentine ordering; nearest-neighbor island sequencing with travel-move insertion and print/travel length statistics
+- **G-code-like & CSV export**: per-layer CSV (index,x,y,z,type) or full-stack G-code (G0 travel / G1 print / layer Z lifts)
+- **Variable layer thickness**: explicit Z-height table input, layers outside (zMin, zMax) are skipped explicitly
+
+## Architecture
 
 ```text
-app/        MainWindow         UI 编排：打开 STL、切片、预览、导出（不写几何算法）
-widgets/    SliceView          2D 路径预览（QPainter）
-graphics/   GLWidget/Camera/   3D 显示与相机交互（只做可视化）
-           Shader/MeshRenderer
-─────────────── 核心库 3DInkPlannerCore（不依赖 Qt UI）───────────────
-io/         STLReader          二进制 STL 解析
-            PathExporter       路径 CSV 导出
-slicing/    TrianglePlaneIntersection  三角形-Z 平面求交
-            SegmentConnector   线段拼接
-            ContourBuilder     轮廓简化
-            Slicer             完整分层编排
-path/       RasterFillGenerator 扫描填充路径
+app/        MainWindow          UI orchestration only (no geometry algorithms)
+widgets/    SliceView           2D layer preview (QPainter)
+graphics/   GLWidget / Camera / MeshRenderer / Shader   OpenGL 3D rendering
+------------ UI layer (Qt6) ------------
 geometry/   GeometryTypes / Polyline / Polygon / Transform
+io/         STLReader / PathExporter (CSV & G-code)
+topology/   IndexedMesh / MeshBuilder (health check & repair)
+slicing/    Slicer / TrianglePlaneIntersection / SegmentConnector
+            / ContourBuilder / ContourClassifier
+path/       RasterFillGenerator / PathOptimizer
+------------ core library 3DInkPlannerCore (pure C++17 + Eigen, no Qt) ------------
+tests/      11 CTest suites, custom zero-dependency assertions
+bench/      bench_pipeline (performance regression tool)
 ```
 
-分层原则：**Geometry / IO / Slicing / Path 层不依赖 Qt**，可独立单元测试；Graphics / Widgets 层只负责可视化。
+## Core Algorithms
 
-## 核心算法
+1. **Triangle–plane intersection**: edge endpoints are classified against the slice plane; edges crossing with a half-open rule emit exactly one point each, so mesh vertices shared by triangles are never double-counted.
+2. **O(n) contour stitching**: unordered segments are chained by endpoint hashing; at T-junctions the minimum-turn continuation wins; unclosed chains are reported explicitly instead of being silently discarded.
+3. **Hole classification**: ray-casting containment count decides outer vs. inner rings (no area heuristics); inner rings attach to their smallest-area parent outer ring.
+4. **Sweep-line slicing**: triangles sorted by zMin are activated/expired as layers ascend — only the active set is intersected. Complexity drops from O(L·F) to O((F+L)·k). Slicing a 130K-face sphere went from 317 ms to 41 ms.
+5. **Multithreaded slicing**: layers are statically partitioned into contiguous ranges; each thread runs an independent sweep line and writes pre-allocated result slots — lock-free, no shared writes, and **bit-identical to serial output** (cross-validated in tests). An atomic work-stealing variant was benchmarked and rejected: per-chunk sweep-line reconstruction cost exceeded the load-balancing gain.
+6. **Scan fill**: scanlines intersect outer + hole rings together and pair intersections by the even-odd rule (holes excluded without boolean ops); serpentine row ordering minimizes travel distance.
+7. **Path optimization**: islands are sequenced by nearest-neighbor greedy search; travel moves are inserted at discontinuities so each layer becomes a fully continuous print/travel sequence with length statistics.
 
-### 1. 三角形-平面求交（`slicing/TrianglePlaneIntersection`）
+## Performance
 
-按顶点相对 `z = h` 的位置分为 Above / Below / On 三类；全 On（共面）忽略；否则收集每条与平面相交的边上的交点。采用**半开区间 `[min, max)`** 规则判断顶点归属，避免共享边/共享顶点被相邻三角形重复计数。
+`bench_pipeline.exe <stl> [layerHeight] [spacing]` (Release, 20 threads):
 
-### 2. 轮廓重建（`slicing/SegmentConnector`）
+| Model | Faces | Layers | Parse | Slicing (parallel / serial) | Toolpath | Total |
+|---|---|---|---|---|---|---|
+| sphere_r30_131k.stl (0.5 mm) | 130,560 | 120 | 45 ms | **28 ms** / 98 ms (3.5×) | 12 ms | **84 ms** |
+| sphere_r30_131k.stl (0.2 mm) | 130,560 | 300 | 43 ms | **42 ms** / 237 ms (5.7×) | 30 ms | **114 ms** |
 
-将无序线段按端点容差 `hypot ≤ tolerance` 贪心双向拼接为有序折线；首尾重合则标记闭合并去掉重复尾点。随后 `ContourBuilder` 以「点到直线距离 ≤ tolerance」移除共线中间点，得到最简轮廓。
+Slicing evolution: brute force 317 ms → sweep-line 41 ms → multithreaded 28 ms (120 layers). Higher layer counts amortize thread startup better (5.7× at 300 layers).
 
-### 3. 扫描填充（`path/RasterFillGenerator`）
+## Build & Run
 
-生成水平扫描线 `y = y₀ + n·spacing`（偏移半个 spacing 避免切过顶点），与多边形边求交后按 x 排序，用 **even-odd 规则**两两配对得到内部扫描段；相邻行 **serpentine** 顺序（偶数行左→右、奇数行右→左）减少空走距离。
-
-## 目录结构
-
-```text
-3DInkPlanner/
-├── app/            MainWindow / main
-├── widgets/        SliceView（2D 预览）
-├── graphics/       GLWidget / Camera / Shader / MeshRenderer
-├── geometry/       几何类型与变换
-├── io/             STLReader / PathExporter
-├── slicing/        切片 / 轮廓重建
-├── path/           扫描填充路径
-├── tests/          8 个无框架单元测试（自写 check 断言，失败返回非零）
-├── tools/          generate_sample_stl.py（演示资产生成器）
-└── assets/models/  cube_20mm.stl / box_with_hole.stl
-```
-
-## 构建
-
-依赖：
-
-- C++17 编译器（VS 2022）
-- Qt 6.8（Widgets / OpenGL / OpenGLWidgets）
-- Eigen 3.4（header-only）
-- CMake ≥ 3.21
+Requirements: CMake ≥ 3.21, Qt ≥ 6.4 (Widgets/OpenGL/OpenGLWidgets), Eigen 3.4 (header-only), a C++17 compiler.
 
 ```bash
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64 \
-      -DCMAKE_PREFIX_PATH=D:/Qt/6.8.3/msvc2022_64 \
-      -DEIGEN3_INCLUDE_DIR=D:/eigen/eigen-3.4.0
-
-cmake --build build --config Release
-```
-
-运行（需将 Qt `bin` 目录加入 PATH，用于定位平台插件 `qwindows.dll`）：
-
-```bash
-set PATH=D:\Qt\6.8.3\msvc2022_64\bin;%PATH%
-build\Release\3DInkPlanner.exe
-```
-
-## 使用
-
-1. `File → Open STL...` 打开 `assets/models/box_with_hole.stl`（或命令行 `3DInkPlanner.exe model.stl`）
-2. 设置层高 / 填充间距，点击「切片并生成路径」
-3. 用底部 Layer Slider 逐层查看轮廓与扫描路径（2D 预览在右侧）
-4. `File → Export Current Layer CSV...` 导出当前层路径
-
-## 测试
-
-```bash
+cmake -S . -B build -DCMAKE_PREFIX_PATH=<Qt6 path> -DEIGEN3_INCLUDE_DIR=<Eigen path>
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-8 个测试套件覆盖：STL 读取、三角形-平面求交、线段拼接、切片、扫描填充、坐标变换、CSV 导出、示例资产集成（多轮廓切片）。均使用自写无依赖断言框架，不引入 GoogleTest。
+Run: `3DInkPlanner.exe <model.stl>` — sample models are in `assets/models/`.
+
+## Testing
+
+11 CTest suites covering: STL reading (binary/ASCII auto-detection), triangle–plane intersection, segment stitching (open-chain / T-junction warnings), slicing (sweep-line vs. per-layer consistency, parallel-vs-serial bit-identical consistency, coplanar warnings), ring classification, scan fill (hole exclusion), path optimization, coordinate transform (adaptive tolerance), CSV & G-code export, sample-asset integration, and topology building. All use a custom zero-dependency assertion style — no external test framework.
 
 ## Known Limitations
 
-- 仅支持 **Binary STL**，ASCII 未实现（读取时明确报错，不会误解析）
-- 不处理 **non-manifold / 自交 / 有洞**网格，无工业级 mesh repair；开放轮廓仅记录不修复
-- 法线直接使用 STL 原始值（无共享顶点拓扑，坏法线会影响光照）
-- 共面三角形被忽略，含大面积水平面且边界无垂直面的模型可能缺失该层轮廓
-- Raster Fill 不处理自交多边形，仅生成 Print 段（未生成换行 Travel 连接段，空走优化留待 PathOptimizer）
-- 坐标变换仅支持**均匀缩放 + 绕 Z 轴旋转**，任意 4×4 标定矩阵导入未实现
-- 切片容差为绝对容差（`1e-6`），超大/超小尺寸模型需按尺寸调整
-- 暂不直接控制打印设备（本 Demo 输出 CSV 路径文件）
+- Triangles **coplanar** with a slice plane are ignored with an explicit warning (2D boolean completion is future work); avoiding slice heights exactly at horizontal faces works around it
+- Non-manifold / boundary edges are **reported, not repaired**; open chains are shown as red dashed lines in preview and excluded from fill
+- PathOptimizer uses nearest-neighbor greedy sequencing (no 2-opt global refinement)
+- G-code-like export is a simplified instruction stream (no extrusion/temperature/speed process parameters) — for pipeline demonstration, not direct machine control
+- Coordinate transform supports uniform scale + Z-axis rotation only
 
-## 示例数据
+## License
 
-```bash
-python tools/generate_sample_stl.py   # 重新生成 assets/models/ 下的演示 STL
-```
-
-- `cube_20mm.stl`：20×20×20 mm 立方体（单轮廓）
-- `box_with_hole.stl`：40×40×10 mm 方块带 20×20 mm 方孔（多轮廓，展示内外壁同时切片）
+MIT — see [LICENSE](LICENSE).
